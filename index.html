@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign in to Microsoft 365</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #f3f2f1;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ---------- Main card ---------- */
+    .login-box {
+      background: #ffffff;
+      width: 440px;
+      padding: 44px 44px 36px;
+      box-shadow: 0 2px 6px rgba(0,0,0,.2);
+    }
+
+    /* Microsoft logo */
+    .ms-logo {
+      display: flex;
+      gap: 3px;
+      margin-bottom: 20px;
+    }
+    .ms-logo-sq {
+      width: 21px; height: 21px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #1b1b1b;
+      margin-bottom: 12px;
+      line-height: 1.3;
+    }
+
+    .subtitle {
+      font-size: .875rem;
+      color: #444;
+      margin-bottom: 28px;
+    }
+
+    /* Email display strip shown after first step */
+    .email-strip {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      font-size: .875rem;
+      color: #1b1b1b;
+      margin-bottom: 20px;
+      padding: 8px 10px;
+      background: #f8f8f8;
+      border: 1px solid #e0e0e0;
+      cursor: pointer;
+    }
+    .email-strip:hover { background: #ededed; }
+    .email-strip .avatar {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: #0078d4; color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .75rem; font-weight: 700; flex-shrink: 0;
+    }
+
+    /* Form inputs */
+    .form-group { margin-bottom: 8px; position: relative; }
+    input[type="email"], input[type="password"] {
+      width: 100%; padding: 8px 10px;
+      font-size: .9375rem; font-family: inherit;
+      border: 1px solid #666;
+      outline: none; color: #1b1b1b;
+      transition: border-color .15s;
+    }
+    input:focus { border-color: #0078d4; border-width: 2px; padding: 7px 9px; }
+    input::placeholder { color: #999; font-size: .875rem; }
+
+    /* Validation message */
+    .field-error {
+      font-size: .75rem; color: #c50f1f;
+      margin-top: 4px; display: none;
+    }
+
+    /* Remember me */
+    .remember {
+      display: flex; align-items: flex-start; gap: 8px;
+      font-size: .8125rem; color: #1b1b1b; margin: 16px 0 20px;
+    }
+    .remember input[type="checkbox"] { margin-top: 2px; accent-color: #0078d4; }
+
+    /* Buttons */
+    .btn-next, .btn-back {
+      width: 100%; padding: 8px 12px;
+      font-size: .9375rem; font-family: inherit; font-weight: 600;
+      cursor: pointer; border: none;
+      transition: background .15s;
+    }
+    .btn-next  { background: #0078d4; color: #fff; margin-bottom: 8px; }
+    .btn-next:hover { background: #006cbe; }
+    .btn-back  { background: transparent; color: #0078d4; border: 1px solid transparent; }
+    .btn-back:hover { border-color: #0078d4; }
+
+    /* Footer links */
+    .footer-links {
+      font-size: .73rem; color: #666;
+      margin-top: 28px; display: flex; gap: 16px; flex-wrap: wrap;
+    }
+    .footer-links a { color: inherit; text-decoration: none; }
+    .footer-links a:hover { text-decoration: underline; }
+
+    /* Loading spinner overlay */
+    .loading-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(255,255,255,.8); z-index: 100;
+      flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+    }
+    .loading-overlay.show { display: flex; }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid #e0e0e0;
+      border-top-color: #0078d4;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-msg { font-size: .875rem; color: #444; }
+
+    /* Phishing warning banner (shown after submission for awareness training) */
+    .warning-banner {
+      display: none; position: fixed; inset: 0;
+      background: #fff; z-index: 200;
+      flex-direction: column; align-items: center; justify-content: center;
+      padding: 40px; text-align: center;
+    }
+    .warning-banner.show { display: flex; }
+    .warning-icon { font-size: 4rem; margin-bottom: 16px; }
+    .warning-title { font-size: 1.5rem; font-weight: 700; color: #c50f1f; margin-bottom: 12px; }
+    .warning-body  { font-size: .9375rem; color: #444; max-width: 480px; line-height: 1.6; }
+    .warning-btn {
+      margin-top: 24px; padding: 10px 32px;
+      background: #0078d4; color: #fff; border: none;
+      font-size: .9375rem; font-weight: 600; cursor: pointer;
+    }
+    .warning-btn:hover { background: #006cbe; }
+
+    /* Step 2 (password) hidden initially */
+    #step2 { display: none; }
+  </style>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-msg">Signing in...</div>
+</div>
+
+<!-- Phishing awareness warning (shown after submit) -->
+<div class="warning-banner" id="warningBanner">
+  <div class="warning-icon">🎣</div>
+  <div class="warning-title">⚠️ This was a Phishing Simulation</div>
+  <div class="warning-body">
+    You just entered your credentials on a <strong>fake Microsoft 365 login page</strong>
+    as part of your company's security awareness programme.<br><br>
+    Real attackers use identical-looking pages to steal passwords.<br>
+    <strong>Always verify the URL</strong> before entering credentials and look for
+    <strong>HTTPS + correct domain</strong> (login.microsoftonline.com).
+  </div>
+  <button class="warning-btn" id="warningOkBtn">I Understand — Continue</button>
+</div>
+
+<!-- Login card -->
+<div class="login-box">
+
+  <!-- Microsoft "Fluent" 2×2 logo squares -->
+  <div class="ms-logo">
+    <svg width="52" height="52" viewBox="0 0 23 23" xmlns="http://www.w3.org/2000/svg">
+      <rect x="1"  y="1"  width="10" height="10" fill="#f25022"/>
+      <rect x="12" y="1"  width="10" height="10" fill="#7fba00"/>
+      <rect x="1"  y="12" width="10" height="10" fill="#00a4ef"/>
+      <rect x="12" y="12" width="10" height="10" fill="#ffb900"/>
+    </svg>
+  </div>
+
+  <!-- Step 1: email -->
+  <div id="step1">
+    <h1>Sign in</h1>
+    <p class="subtitle">Use your Microsoft account</p>
+    <form id="step1Form" autocomplete="off" novalidate>
+      <div class="form-group">
+        <input type="email" id="emailInput" placeholder="Email, phone, or Skype"
+               autocomplete="username" spellcheck="false" required />
+        <div class="field-error" id="emailError">Enter a valid email address.</div>
+      </div>
+      <div class="remember">
+        <input type="checkbox" id="rememberMe" checked />
+        <label for="rememberMe">Keep me signed in</label>
+      </div>
+      <button type="submit" class="btn-next">Next</button>
+      <button type="button" class="btn-back"
+              onclick="window.open('https://support.microsoft.com/en-us/account-billing/how-to-create-a-new-microsoft-account-a84675c3-3e9e-17cf-2911-3d56b15c0aaf', '_blank')">
+        Create account
+      </button>
+    </form>
+  </div>
+
+  <!-- Step 2: password (shown after email step) -->
+  <div id="step2">
+    <div class="email-strip" id="emailStrip">
+      <div class="avatar" id="avatarInitial">?</div>
+      <span id="emailDisplay"></span>
+    </div>
+    <h1>Enter password</h1>
+    <form id="step2Form" autocomplete="off" novalidate>
+      <div class="form-group">
+        <input type="password" id="passwordInput" placeholder="Password"
+               autocomplete="current-password" required />
+        <div class="field-error" id="pwError">Please enter your password.</div>
+      </div>
+      <div class="remember">
+        <input type="checkbox" id="staySignedIn" checked />
+        <label for="staySignedIn">Stay signed in?</label>
+      </div>
+      <button type="submit" class="btn-next">Sign in</button>
+      <button type="button" class="btn-back" onclick="goBack()">Back</button>
+    </form>
+    <div class="footer-links">
+      <a href="#">Forgot password?</a>
+      <a href="#">Sign-in options</a>
+    </div>
+  </div>
+
+  <div class="footer-links" id="step1Footer">
+    <a href="#">Terms of use</a>
+    <a href="#">Privacy &amp; cookies</a>
+  </div>
+</div>
+
+<script>
+  /* =====================================================================
+     Tracking configuration – read from URL query parameters:
+       t   = tracking token (from email)
+       api = base URL of the Azure Function app (e.g. https://myfunc.azurewebsites.net)
+       r   = redirect URL shown to user after "signing in"
+
+     Example URL:
+       https://yourname.github.io/phish-landing/?t=abc123&api=https%3A%2F%2Fmyfunc.azurewebsites.net&r=https%3A%2F%2Flogin.microsoftonline.com
+  ===================================================================== */
+
+  const _params   = new URLSearchParams(location.search);
+  const _token    = (_params.get('t') || '').trim();
+  const _apiBase  = (_params.get('api') || '').replace(/\/+$/, '');
+  const _redirect = (_params.get('r')   || 'https://login.microsoftonline.com').trim();
+
+  /* ------- Send tracking beacon immediately on page load ------- */
+  (function sendClickBeacon() {
+    if (!_token || !_apiBase) return;  // nothing to track
+    try {
+      // Use a no-cors fetch so we don't need CORS headers on the server.
+      // The tracking server records the hit; we don't need the response.
+      fetch(_apiBase + '/api/track/ping/' + encodeURIComponent(_token) + '?_=' + Date.now(), {
+        method: 'GET',
+        mode: 'no-cors',
+        cache: 'no-store',
+      }).catch(function() {});          // silently ignore network errors
+
+      // Fallback: Image beacon (works even when fetch is blocked)
+      var img = new Image();
+      img.src = _apiBase + '/api/track/ping/' + encodeURIComponent(_token) + '?src=img&_=' + Date.now();
+
+    } catch (e) { /* silent */ }
+  })();
+
+  /* ------- Step-1 form (email) ------- */
+  document.getElementById('step1Form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var email = document.getElementById('emailInput').value.trim();
+    var errEl = document.getElementById('emailError');
+    if (!email || !email.includes('@')) {
+      errEl.style.display = 'block';
+      document.getElementById('emailInput').focus();
+      return;
+    }
+    errEl.style.display = 'none';
+
+    // Populate step-2
+    document.getElementById('emailDisplay').textContent = email;
+    var initial = email[0].toUpperCase();
+    document.getElementById('avatarInitial').textContent = initial;
+
+    document.getElementById('step1').style.display = 'none';
+    document.getElementById('step1Footer').style.display = 'none';
+    document.getElementById('step2').style.display = 'block';
+    document.getElementById('passwordInput').focus();
+  });
+
+  /* ------- Email strip click → go back ------- */
+  document.getElementById('emailStrip').addEventListener('click', goBack);
+
+  function goBack() {
+    document.getElementById('step2').style.display = 'none';
+    document.getElementById('step1').style.display = 'block';
+    document.getElementById('step1Footer').style.display = 'flex';
+    document.getElementById('emailInput').focus();
+  }
+
+  /* ------- Step-2 form (password) ------- */
+  document.getElementById('step2Form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var pw = document.getElementById('passwordInput').value;
+    var errEl = document.getElementById('pwError');
+    if (!pw) {
+      errEl.style.display = 'block';
+      document.getElementById('passwordInput').focus();
+      return;
+    }
+    errEl.style.display = 'none';
+
+    // Show loading for realism
+    document.getElementById('loadingOverlay').classList.add('show');
+
+    // After 1.5s show the phishing warning (security awareness training)
+    setTimeout(function() {
+      document.getElementById('loadingOverlay').classList.remove('show');
+      document.getElementById('warningBanner').classList.add('show');
+    }, 1500);
+  });
+
+  /* ------- Warning "I understand" button ------- */
+  document.getElementById('warningOkBtn').addEventListener('click', function() {
+    window.location.href = _redirect;
+  });
+
+  /* ------- Pre-fill email if present in URL (optional) ------- */
+  var preEmail = _params.get('email');
+  if (preEmail) {
+    document.getElementById('emailInput').value = decodeURIComponent(preEmail);
+  }
+</script>
+</body>
+</html>
